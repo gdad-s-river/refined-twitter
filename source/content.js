@@ -1,5 +1,7 @@
 import domLoaded from 'dom-loaded';
-import {observeEl, safeElementReady, safely} from './libs/utils';
+import debounce from 'lodash.debounce';
+
+import {observeEl, safeElementReady, safely, getFromLocalStorage} from './libs/utils';
 import autoLoadNewTweets from './features/auto-load-new-tweets';
 import inlineInstagramPhotos from './features/inline-instagram-photos';
 import userChoiceColor from './features/user-choice-color';
@@ -7,9 +9,17 @@ import codeHighlight from './features/code-highlight';
 import mentionHighlight from './features/mentions-highlight';
 import addLikesButtonNavBar from './features/likes-button-navbar';
 import keyboardShortcuts from './features/keyboard-shortcuts';
-import {onDMDialogOpen, onDMDelete} from './features/preserve-text-messages';
+// import {onDMDialogOpen, onDMDelete} from './features/preserve-text-messages';
 import renderInlineCode from './features/inline-code';
 import disableCustomColors from './features/disable-custom-colors';
+
+import {
+	removeMessages,
+	idsOfNonEmptyMsgs,
+	idsOfNotDeletedMsgs,
+	restoreSavedMessage,
+	handleMessageChange
+} from './features/preserve-text-messages';
 
 function cleanNavbarDropdown() {
 	$('#user-dropdown').find('[data-nav="all_moments"], [data-nav="ads"], [data-nav="promote-mode"], [data-nav="help_center"]').parent().hide();
@@ -66,6 +76,83 @@ function removeProfileHeader() {
 	$('.ProfileCanopy-header').remove();
 }
 
+// let DMDialogueOpen = false;
+
+function onDMDialogOpenAndClose(handleOpen, handleClose) {
+	observeEl('#dm_dialog', async mutations => {
+		for (const mutation of mutations) {
+			if (mutation.target.style.display === 'none') {
+				// DMDialogueOpen = false;
+				handleClose();
+			} else {
+				// DMDialogueOpen = true;
+				handleOpen();
+			}
+		}
+	}, {attributes: true});
+}
+
+function onConversationOpen(cb) {
+	const DMOpenMutationOptions = {
+		attributes: true,
+		attributeFilter: ['class']
+	};
+
+	observeEl('.DMConversation', mutations => {
+		for (const mutation of mutations) {
+			if (mutation.target.classList.contains('DMActivity--open')) {
+				cb(); // fetchStoredMessage , onMessageChange
+				break;
+			}
+		}
+	}, DMOpenMutationOptions)
+}
+
+function onMessageDelete(cb) {
+	const messageDelMutatioOptions = {
+		childList: true,
+		subtree: true,
+		attributes: true
+	};
+
+	observeEl('body', async mutations => {
+		for (const mutation of mutations) {
+			if (mutation.target.id === 'confirm_dialog') {
+				$('#confirm_dialog_submit_button').on('click', () => {
+					cb(); // remove the msg which is deleted
+				});
+	
+				break;
+			}
+		}
+	}, messageDelMutatioOptions);
+}
+
+function onMessageChange(cb) {
+	const msgChangeMutationOptions = {
+		childList: true,
+		subtree: true,
+		characterData: true
+	};
+
+	observeEl('#tweet-box-dm-conversation', debounce(async () => {
+		cb();
+	}, 150), msgChangeMutationOptions);
+}
+
+const handleDMWindowOpen = () => {
+	onConversationOpen(() => {
+		safely(restoreSavedMessage);
+		onMessageChange(() => {
+			safely(handleMessageChange);
+		})
+	});
+};
+
+const handleDMWindowClose = () => {
+	safely(() => removeMessages(idsOfNonEmptyMsgs));
+}
+
 function onDomReady() {
 	safely(cleanNavbarDropdown);
 	safely(keyboardShortcuts);
@@ -93,8 +180,14 @@ function onDomReady() {
 		safely(renderInlineCode);
 	});
 
-	safely(onDMDialogOpen);
-	safely(onDMDelete);
+	onDMDialogOpenAndClose(
+		handleDMWindowOpen,
+		handleDMWindowClose
+	);
+
+	onMessageDelete(() => {
+		removeMessages(idsOfNotDeletedMsgs);
+	});
 }
 
 init();
