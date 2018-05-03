@@ -1,7 +1,14 @@
 import domLoaded from 'dom-loaded';
 import debounce from 'lodash.debounce';
 
-import {observeEl, safeElementReady, safely, getFromLocalStorage} from './libs/utils';
+import {
+	observeEl, 
+	safeElementReady, 
+	safely, 
+	getFromLocalStorage, 
+	setToLocalStorage
+} from './libs/utils';
+
 import autoLoadNewTweets from './features/auto-load-new-tweets';
 import inlineInstagramPhotos from './features/inline-instagram-photos';
 import userChoiceColor from './features/user-choice-color';
@@ -18,7 +25,7 @@ import {
 	idsOfNonEmptyMsgs,
 	idsOfNotDeletedMsgs,
 	restoreSavedMessage,
-	handleMessageChange
+	handleMessageChange,
 } from './features/preserve-text-messages';
 
 function cleanNavbarDropdown() {
@@ -83,10 +90,16 @@ function onDMDialogOpenAndClose(handleOpen, handleClose) {
 		for (const mutation of mutations) {
 			if (mutation.target.style.display === 'none') {
 				// DMDialogueOpen = false;
+				const DMModalStatus = {isDMModalOpen: false};
+				
+				setToLocalStorage({DMModalStatus});
 				handleClose();
 				break;
 			} else {
 				// DMDialogueOpen = true;
+				const DMModalStatus = {isDMModalOpen: true};
+				
+				setToLocalStorage({DMModalStatus});				
 				const DMOpenMutationOptions = {
 					attributes: true,
 					attributeFilter: ['class']
@@ -121,8 +134,23 @@ function onMessageChange(cb) {
 
 const handleDMWindowOpen = () => {
 	safely(restoreSavedMessage);
+
+	let isDMModalOpen = true;
+
+	// start listening for DMModalStatus changes
+	// we need this to pass onto handleMessageChange
+	// see handleMessageChange definition to know why
+	browser.storage.onChanged.addListener((changes, area) => {
+		if (
+			area === 'local'
+			&& (changes.DMModalStatus && changes.DMModalStatus.newValue)
+		) {
+			isDMModalOpen = changes.DMModalStatus.newValue.isDMModalOpen;
+		}
+	});
+
 	onMessageChange(() => {
-		safely(handleMessageChange);
+		safely(() => handleMessageChange(isDMModalOpen));
 	})
 };
 

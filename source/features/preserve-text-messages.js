@@ -19,7 +19,6 @@ export async function removeMessages(refinedMsgIdsMaker) {
 		messages: pick(savedMessages, idsOfMsgToReSave)
 	}
 
-	console.log('setting to localstorage');
 	setToLocalStorage(updatedMessages);
 }
 
@@ -77,7 +76,7 @@ export async function restoreSavedMessage() {
 	}
 }
 
-export async function handleMessageChange() {
+export async function handleMessageChange(isDMModalOpen) {
 	const conversationId = getConversationId();
 	const currentMessage = getMessageContainer().html();
 
@@ -88,13 +87,14 @@ export async function handleMessageChange() {
 		messages: Object.assign((savedMessages || {}), {[conversationId]: currentMessage})
 	}
 
-	console.log('setting to localstorage');
-	// dangerous -> not checking DMDialogOpen boolean
-
-		// should only store if window is open;
-	console.log(document.querySelector('#dm_dialog').style.display);
-	setToLocalStorage(updatedMessages);
-
+	// we need to check if DMModal is open because
+	// twitter unsets the message when DMModal closes
+	// hence we need a way to tell handleMessageChange
+	// to not store empty message (which happens when DMModal closes) 
+	// in local storage 
+	if (isDMModalOpen) {
+		setToLocalStorage(updatedMessages);
+	}
 }
 
 function fillContainerWithMessage(messageContainer, savedMessage) {
