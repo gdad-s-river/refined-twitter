@@ -59,7 +59,6 @@ export function isEmptyMsgInput(message) {
 export async function restoreSavedMessage() {
 	const conversationId = getConversationId();
 	const messageContainer = getMessageContainer();
-	// TODO: see if this check is necessary
 	if (conversationId) {
 		const {messages: savedMessages} = await getFromLocalStorage('messages');
 

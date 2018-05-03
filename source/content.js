@@ -15,8 +15,7 @@ import userChoiceColor from './features/user-choice-color';
 import codeHighlight from './features/code-highlight';
 import mentionHighlight from './features/mentions-highlight';
 import addLikesButtonNavBar from './features/likes-button-navbar';
-import keyboardShortcuts from './features/keyboard-shortcuts';
-// import {onDMDialogOpen, onDMDelete} from './features/preserve-text-messages';
+import keyboardShortcuts from './features/keyboard-shortcuts'; 
 import renderInlineCode from './features/inline-code';
 import disableCustomColors from './features/disable-custom-colors';
 
@@ -83,36 +82,27 @@ function removeProfileHeader() {
 	$('.ProfileCanopy-header').remove();
 }
 
-// let DMDialogueOpen = false;
-
-function onDMDialogOpenAndClose(handleOpen, handleClose) {
+function onDMModalOpenAndClose(handleConversationOpen, handleDMModalClose) {
 	observeEl('#dm_dialog', async mutations => {
 		for (const mutation of mutations) {
 			if (mutation.target.style.display === 'none') {
-				// DMDialogueOpen = false;
-				const DMModalStatus = {isDMModalOpen: false};
-				
-				setToLocalStorage({DMModalStatus});
-				handleClose();
+				// this is necessary for handleMessageChange function
+				setToLocalStorage({isDMModalOpen: false});
+
+				handleDMModalClose();
 				break;
 			} else {
-				// DMDialogueOpen = true;
-				const DMModalStatus = {isDMModalOpen: true};
-				
-				setToLocalStorage({DMModalStatus});				
-				const DMOpenMutationOptions = {
-					attributes: true,
-					attributeFilter: ['class']
-				};
+				// this is necessary for handleMessageChange function						
+				setToLocalStorage({isDMModalOpen: true});
 			
 				observeEl('.DMConversation', mutations => {
 					for (const mutation of mutations) {
 						if (mutation.target.classList.contains('DMActivity--open')) {
-							handleOpen(); // fetchStoredMessage , onMessageChange
+							handleConversationOpen();
 							break;
 						}
 					}
-				}, DMOpenMutationOptions);
+				}, {attributes: true,attributeFilter: ['class']});
 
 				break;
 			}
@@ -132,9 +122,12 @@ function onMessageChange(cb) {
 	}, 150), msgChangeMutationOptions);
 }
 
-const handleDMWindowOpen = () => {
+const handleConversationOpen = () => {
 	safely(restoreSavedMessage);
 
+	// let a user start typing when conversatio opens
+	// see handleMessageChange to see where this boolean 
+	// is used and why
 	let isDMModalOpen = true;
 
 	// start listening for DMModalStatus changes
@@ -143,9 +136,9 @@ const handleDMWindowOpen = () => {
 	browser.storage.onChanged.addListener((changes, area) => {
 		if (
 			area === 'local'
-			&& (changes.DMModalStatus && changes.DMModalStatus.newValue)
+			&& (changes.isDMModalOpen)
 		) {
-			isDMModalOpen = changes.DMModalStatus.newValue.isDMModalOpen;
+			isDMModalOpen = changes.isDMModalOpen.newValue;
 		}
 	});
 
@@ -165,7 +158,7 @@ function onMessageDelete(cb) {
 		for (const mutation of mutations) {
 			if (mutation.target.id === 'confirm_dialog') {
 				$('#confirm_dialog_submit_button').on('click', () => {
-					cb(); // remove the msg which is deleted
+					cb();
 				});
 	
 				break;
@@ -174,7 +167,7 @@ function onMessageDelete(cb) {
 	}, messageDelMutatioOptions);
 }
 
-const handleDMWindowClose = () => {
+const handleDMModalClose = () => {
 	safely(() => removeMessages(idsOfNonEmptyMsgs));
 }
 
@@ -205,13 +198,15 @@ function onDomReady() {
 		safely(renderInlineCode);
 	});
 
-	onDMDialogOpenAndClose(
-		handleDMWindowOpen,
-		handleDMWindowClose
+	onDMModalOpenAndClose(
+		handleConversationOpen,
+		handleDMModalClose
 	);
 
+	// when the user deletes the conversation
+	// remove it from local storage
 	onMessageDelete(() => {
-		removeMessages(idsOfNotDeletedMsgs);
+		safely(() => removeMessages(idsOfNotDeletedMsgs));
 	});
 }
 
