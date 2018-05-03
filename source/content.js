@@ -84,29 +84,47 @@ function onDMDialogOpenAndClose(handleOpen, handleClose) {
 			if (mutation.target.style.display === 'none') {
 				// DMDialogueOpen = false;
 				handleClose();
+				break;
 			} else {
 				// DMDialogueOpen = true;
-				handleOpen();
+				const DMOpenMutationOptions = {
+					attributes: true,
+					attributeFilter: ['class']
+				};
+			
+				observeEl('.DMConversation', mutations => {
+					for (const mutation of mutations) {
+						if (mutation.target.classList.contains('DMActivity--open')) {
+							handleOpen(); // fetchStoredMessage , onMessageChange
+							break;
+						}
+					}
+				}, DMOpenMutationOptions);
+
+				break;
 			}
 		}
 	}, {attributes: true});
 }
 
-function onConversationOpen(cb) {
-	const DMOpenMutationOptions = {
-		attributes: true,
-		attributeFilter: ['class']
+function onMessageChange(cb) {
+	const msgChangeMutationOptions = {
+		childList: true,
+		subtree: true,
+		characterData: true
 	};
 
-	observeEl('.DMConversation', mutations => {
-		for (const mutation of mutations) {
-			if (mutation.target.classList.contains('DMActivity--open')) {
-				cb(); // fetchStoredMessage , onMessageChange
-				break;
-			}
-		}
-	}, DMOpenMutationOptions)
+	observeEl('#tweet-box-dm-conversation', debounce(async () => {
+		cb();
+	}, 150), msgChangeMutationOptions);
 }
+
+const handleDMWindowOpen = () => {
+	safely(restoreSavedMessage);
+	onMessageChange(() => {
+		safely(handleMessageChange);
+	})
+};
 
 function onMessageDelete(cb) {
 	const messageDelMutatioOptions = {
@@ -127,27 +145,6 @@ function onMessageDelete(cb) {
 		}
 	}, messageDelMutatioOptions);
 }
-
-function onMessageChange(cb) {
-	const msgChangeMutationOptions = {
-		childList: true,
-		subtree: true,
-		characterData: true
-	};
-
-	observeEl('#tweet-box-dm-conversation', debounce(async () => {
-		cb();
-	}, 150), msgChangeMutationOptions);
-}
-
-const handleDMWindowOpen = () => {
-	onConversationOpen(() => {
-		safely(restoreSavedMessage);
-		onMessageChange(() => {
-			safely(handleMessageChange);
-		})
-	});
-};
 
 const handleDMWindowClose = () => {
 	safely(() => removeMessages(idsOfNonEmptyMsgs));
