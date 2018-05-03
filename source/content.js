@@ -83,7 +83,7 @@ function removeProfileHeader() {
 }
 
 function onDMModalOpenAndClose(handleConversationOpen, handleDMModalClose) {
-	observeEl('#dm_dialog', async mutations => {
+	observeEl('#dm_dialog', mutations => {
 		for (const mutation of mutations) {
 			if (mutation.target.style.display === 'none') {
 				// this is necessary for handleMessageChange function
@@ -117,7 +117,7 @@ function onMessageChange(cb) {
 		characterData: true
 	};
 
-	observeEl('#tweet-box-dm-conversation', debounce(async () => {
+	observeEl('#tweet-box-dm-conversation', debounce(() => {
 		cb();
 	}, 150), msgChangeMutationOptions);
 }
@@ -154,13 +154,17 @@ function onMessageDelete(cb) {
 		attributes: true
 	};
 
-	observeEl('body', async mutations => {
+	observeEl('body', mutations => {
 		for (const mutation of mutations) {
 			if (mutation.target.id === 'confirm_dialog') {
-				$('#confirm_dialog_submit_button').on('click', () => {
+				const deleteButton = $('#confirm_dialog_submit_button');
+
+				const onDeleteButtonClick = () => {
 					cb();
-				});
-	
+					deleteButton.off('click');
+				}
+
+				deleteButton.on('click', onDeleteButtonClick);
 				break;
 			}
 		}
